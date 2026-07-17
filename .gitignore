@@ -1,0 +1,22 @@
+# Xcode / Swift Package Manager
+.build/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Reference study repos (Inspirations documented in INSPIRATIONS.md)
+.reference/
+
+# macOS
+.DS_Store
+*.swp
+*~.nib
+
+# Caches & Scratch
+scratch/
+*.log

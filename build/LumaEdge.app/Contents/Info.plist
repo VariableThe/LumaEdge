@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>LumaEdgeApp</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.lumaedge.app</string>
+    <key>CFBundleName</key>
+    <string>LumaEdge</string>
+    <key>CFBundleDisplayName</key>
+    <string>LumaEdge</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSCameraUsageDescription</key>
+    <string>LumaEdge monitors active video camera status to automatically turn on edge lighting during video calls.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>LumaEdge monitors microphone active status to detect calls and trigger lighting profiles.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.lumaedge.url</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>lumaedge</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
