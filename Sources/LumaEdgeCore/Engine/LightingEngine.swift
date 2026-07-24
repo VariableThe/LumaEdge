@@ -13,6 +13,8 @@ public final class LightingEngine: ObservableObject {
         static let cursorMinOpacity = "LumaEdge_CursorMinOpacity"
         static let isCursorFadingEnabled = "LumaEdge_IsCursorFadingEnabled"
         static let safeWorkspaceMode = "LumaEdge_SafeWorkspaceMode"
+        static let ambientLightThreshold = "LumaEdge_AmbientLightThreshold"
+        static let isAmbientLightGatingEnabled = "LumaEdge_IsAmbientLightGatingEnabled"
     }
     
     private let defaults = UserDefaults.standard
@@ -34,9 +36,38 @@ public final class LightingEngine: ObservableObject {
         }
     }
     
-    /// True only when the user has armed lighting *and* a camera is in use.
+    /// System ambient light sensor
+    public let ambientLightSensor = AmbientLightSensor.shared
+
+    /// Minimum ambient lux level below which the edge light will activate.
+    /// Calculation: at 120 lux ambient, the screen's white-area contribution (~20–50 lux
+    /// at typical brightness) brings total face illumination to ~150 lux, above which
+    /// the edge light's ~30–50 lux boost becomes imperceptible.
+    @Published public var ambientLightThreshold: Double = 120.0 {
+        didSet {
+            defaults.set(ambientLightThreshold, forKey: DefaultsKeys.ambientLightThreshold)
+        }
+    }
+
+    /// When enabled, the edge light is gated on ambient light level (below threshold).
+    /// When disabled, ambient condition is ignored (light always shows if other gates pass).
+    @Published public var isAmbientLightGatingEnabled: Bool = true {
+        didSet {
+            defaults.set(isAmbientLightGatingEnabled, forKey: DefaultsKeys.isAmbientLightGatingEnabled)
+            notifyOverlayUpdate()
+        }
+    }
+
+    private var isAmbientLightLowEnough: Bool {
+        guard isAmbientLightGatingEnabled else { return true }
+        guard ambientLightSensor.isAvailable else { return true }
+        return ambientLightSensor.lux < ambientLightThreshold
+    }
+
+    /// True only when all illumination conditions are satisfied:
+    /// master armed, camera active, and ambient light is below threshold.
     public var isEffectivelyIlluminated: Bool {
-        isMasterEnabled && isCameraActive
+        isMasterEnabled && isCameraActive && isAmbientLightLowEnough
     }
     
     public func setCameraActive(_ active: Bool) {
@@ -108,12 +139,12 @@ public final class LightingEngine: ObservableObject {
     
     public init() {
         self.isMasterEnabled = defaults.object(forKey: DefaultsKeys.isMasterEnabled) as? Bool ?? true
-        
+
         let presetID = defaults.string(forKey: DefaultsKeys.activePresetID) ?? "studio_white"
         if let found = GlowPreset.builtInPresets.first(where: { $0.id == presetID }) {
             self.activePreset = found
         }
-        
+
         if let dist = defaults.object(forKey: DefaultsKeys.cursorFadeDistance) as? Double {
             self.cursorFadeDistance = dist
         }
@@ -127,8 +158,23 @@ public final class LightingEngine: ObservableObject {
            let mode = SafeWorkspaceMode(rawValue: modeRaw) {
             self.safeWorkspaceMode = mode
         }
-        
+        if let threshold = defaults.object(forKey: DefaultsKeys.ambientLightThreshold) as? Double {
+            self.ambientLightThreshold = threshold
+        }
+        if let gating = defaults.object(forKey: DefaultsKeys.isAmbientLightGatingEnabled) as? Bool {
+            self.isAmbientLightGatingEnabled = gating
+        }
+
         loadMonitorConfigs()
+        startAmbientLightMonitoring()
+    }
+
+    private func startAmbientLightMonitoring() {
+        ambientLightSensor.startMonitoring { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.notifyOverlayUpdate()
+            }
+        }
     }
     
     public func toggleMaster() {

@@ -182,10 +182,29 @@ public struct MenuBarView: View {
     
     private var statusCaption: String {
         if !engine.isMasterEnabled {
-            return "Off — won’t light during calls"
+            return "Off — won't light during calls"
+        }
+        if !engine.isAmbientLightGatingEnabled {
+            if engine.isCameraActive {
+                return "Camera on — edge light active"
+            }
+            return "Armed — waits for camera"
+        }
+        if !engine.ambientLightSensor.isAvailable {
+            return "No ambient sensor — light always allowed"
+        }
+        if engine.ambientLightSensor.lux < 0 {
+            return "Measuring ambient light…"
         }
         if engine.isCameraActive {
-            return "Camera on — edge light active"
+            if engine.isEffectivelyIlluminated {
+                return "\(Int(engine.ambientLightSensor.lux)) lux — edge light active"
+            } else {
+                return "\(Int(engine.ambientLightSensor.lux)) lux — too bright, light paused"
+            }
+        }
+        if engine.ambientLightSensor.lux >= engine.ambientLightThreshold {
+            return "\(Int(engine.ambientLightSensor.lux)) lux — waiting for darker room"
         }
         return "Armed — waits for camera"
     }
