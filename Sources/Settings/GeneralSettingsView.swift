@@ -28,6 +28,42 @@ public struct GeneralSettingsView: View {
                 }
             }
             
+            Section("Ambient Light Gating") {
+                Toggle("Gate edge light on ambient brightness", isOn: $engine.isAmbientLightGatingEnabled)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Ambient Light Threshold")
+                        Spacer()
+                        if engine.ambientLightSensor.isAvailable {
+                            Text("\(Int(engine.ambientLightThreshold)) lux")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Sensor unavailable")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Slider(value: $engine.ambientLightThreshold, in: 20...400, step: 10)
+                        .disabled(!engine.isAmbientLightGatingEnabled)
+                    Text("Edge light activates when ambient light falls below this level. Threshold calculation: at ~120 lux, the screen's white-area contribution (~20–50 lux from video call content) brings total face illumination past 150 lux, where the edge light's 30–50 lux boost becomes imperceptible.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                HStack {
+                    Text("Current ambient")
+                    Spacer()
+                    if engine.ambientLightSensor.isAvailable {
+                        Text("\(Int(engine.ambientLightSensor.lux)) lux")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("No sensor detected")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
             Section("Cursor-Aware Transparency (Phase 2 Preview)") {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
