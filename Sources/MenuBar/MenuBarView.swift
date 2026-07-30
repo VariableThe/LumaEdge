@@ -34,6 +34,11 @@ public struct MenuBarView: View {
                         Text(statusCaption)
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
+                        if engine.ambientLightSensor.isAvailable && engine.ambientLightSensor.lux >= 0 {
+                            Text("\(Int(engine.ambientLightSensor.lux)) lux")
+                                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
                 Spacer()
@@ -188,7 +193,7 @@ public struct MenuBarView: View {
             if engine.isCameraActive {
                 return "Camera on — edge light active"
             }
-        return "\(Int(engine.ambientLightSensor.lux)) lux — armed, waits for camera"
+            return "Armed — waits for camera"
         }
         if !engine.ambientLightSensor.isAvailable {
             return "No ambient sensor — light always allowed"
