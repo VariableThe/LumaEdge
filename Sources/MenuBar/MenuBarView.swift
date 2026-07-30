@@ -72,7 +72,7 @@ public struct MenuBarView: View {
                         .font(.system(size: 12, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $thickness, in: 16.0...160.0, step: 2.0)
+                Slider(value: $thickness, in: 16.0...800.0, step: 4.0)
                     .onChange(of: thickness) { oldValue, newValue in
                         updateThickness(newValue)
                     }
