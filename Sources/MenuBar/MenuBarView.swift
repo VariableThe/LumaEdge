@@ -4,6 +4,7 @@ import DisplayManager
 
 public struct MenuBarView: View {
     @ObservedObject private var engine = LightingEngine.shared
+    @ObservedObject private var sensor = AmbientLightSensor.shared
     @ObservedObject private var displayController = DisplayController.shared
     @State private var selectedScreenID: String
     @State private var brightness: Double = 0.82
@@ -34,6 +35,12 @@ public struct MenuBarView: View {
                         Text(statusCaption)
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            Circle().fill(sensor.isAvailable ? Color.green : Color.red).frame(width: 6, height: 6)
+                            Text(sensor.isAvailable ? "\(Int(sensor.lux)) lux" : "no sensor")
+                        }
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
@@ -72,7 +79,7 @@ public struct MenuBarView: View {
                         .font(.system(size: 12, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $thickness, in: 16.0...160.0, step: 2.0)
+                Slider(value: $thickness, in: 16.0...800.0, step: 4.0)
                     .onChange(of: thickness) { oldValue, newValue in
                         updateThickness(newValue)
                     }
@@ -190,21 +197,21 @@ public struct MenuBarView: View {
             }
             return "Armed — waits for camera"
         }
-        if !engine.ambientLightSensor.isAvailable {
+        if !sensor.isAvailable {
             return "No ambient sensor — light always allowed"
         }
-        if engine.ambientLightSensor.lux < 0 {
+        if sensor.lux < 0 {
             return "Measuring ambient light…"
         }
         if engine.isCameraActive {
             if engine.isEffectivelyIlluminated {
-                return "\(Int(engine.ambientLightSensor.lux)) lux — edge light active"
+                return "\(Int(sensor.lux)) lux — edge light active"
             } else {
-                return "\(Int(engine.ambientLightSensor.lux)) lux — too bright, light paused"
+                return "\(Int(sensor.lux)) lux — too bright, light paused"
             }
         }
-        if engine.ambientLightSensor.lux >= engine.ambientLightThreshold {
-            return "\(Int(engine.ambientLightSensor.lux)) lux — waiting for darker room"
+        if sensor.lux >= engine.ambientLightThreshold {
+            return "\(Int(sensor.lux)) lux — waiting for darker room"
         }
         return "Armed — waits for camera"
     }

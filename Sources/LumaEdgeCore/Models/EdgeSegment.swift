@@ -105,7 +105,7 @@ public struct EdgeSegment: Codable, Identifiable, Equatable, Sendable {
         self.edge = edge
         self.startFraction = max(0.0, min(1.0, startFraction))
         self.endFraction = max(self.startFraction, min(1.0, endFraction))
-        self.thickness = max(4.0, min(500.0, thickness))
+        self.thickness = max(4.0, min(2000.0, thickness))
         self.kelvinTemp = max(2000.0, min(10000.0, kelvinTemp))
         self.colorHex = colorHex
         self.brightness = max(0.0, min(1.0, brightness))
