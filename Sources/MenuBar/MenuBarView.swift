@@ -188,7 +188,7 @@ public struct MenuBarView: View {
             if engine.isCameraActive {
                 return "Camera on — edge light active"
             }
-            return "Armed — waits for camera"
+        return "\(Int(engine.ambientLightSensor.lux)) lux — armed, waits for camera"
         }
         if !engine.ambientLightSensor.isAvailable {
             return "No ambient sensor — light always allowed"
