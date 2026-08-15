@@ -14,7 +14,7 @@ public struct ProfilesSettingsView: View {
     public var body: some View {
         Form {
             Section("Camera-Gated Lighting") {
-                Text("Edge light only appears when the menu bar switch is on *and* a camera is in use (Zoom, FaceTime, Meet, Teams, OBS, etc.). Turning the switch on arms lighting for your next call; it stays dark while the webcam is idle.")
+                Text("Edge light appears only when the menu bar switch is on and another application is using a camera. Ambient-light gating can further pause it in a bright room.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 

@@ -17,28 +17,12 @@ public struct CanvasEdgeView: View {
             let opacity = masterOpacity * config.brightnessScale
             ZStack {
                 if config.isEnabled && opacity > 0.01 {
-                    if config.isVirtualRingMode {
-                        ForEach(enabledSegments) { segment in
-                            SoftSegmentGlow(
-                                segment: segment,
-                                screenSize: geometry.size,
-                                masterOpacity: opacity
-                            )
-                        }
-                    } else if isContinuousFullFrame {
-                        ContinuousFrameGlow(
-                            segments: enabledSegments,
+                    ForEach(enabledSegments) { segment in
+                        SoftSegmentGlow(
+                            segment: segment,
                             screenSize: geometry.size,
                             masterOpacity: opacity
                         )
-                    } else {
-                        ForEach(enabledSegments) { segment in
-                            SoftSegmentGlow(
-                                segment: segment,
-                                screenSize: geometry.size,
-                                masterOpacity: opacity
-                            )
-                        }
                     }
                 }
             }
@@ -52,54 +36,6 @@ public struct CanvasEdgeView: View {
         config.segments.filter(\.isEnabled)
     }
     
-    private var isContinuousFullFrame: Bool {
-        let edges = Set(enabledSegments.map(\.edge))
-        guard edges.count == 4,
-              edges.contains(.top), edges.contains(.bottom),
-              edges.contains(.left), edges.contains(.right) else {
-            return false
-        }
-        return enabledSegments.allSatisfy { seg in
-            seg.startFraction <= 0.02 && seg.endFraction >= 0.98
-        }
-    }
-}
-
-// MARK: - Continuous full-frame glow
-// All layers share the same path inset so bloom never drifts away from the light.
-
-private struct ContinuousFrameGlow: View {
-    let segments: [EdgeSegment]
-    let screenSize: CGSize
-    let masterOpacity: Double
-    
-    var body: some View {
-        let metrics = FrameMetrics(segments: segments, screenSize: screenSize)
-        let intensity = metrics.averageBrightness * masterOpacity
-        
-        frameStroke(
-            inset: metrics.inset,
-            lineWidth: metrics.thickness * 0.5,
-            blur: metrics.blur,
-            color: .white.opacity(intensity),
-            cornerRadius: metrics.outerRadius
-        )
-        .blendMode(.plusLighter)
-        .frame(width: screenSize.width, height: screenSize.height)
-    }
-    
-    private func frameStroke(
-        inset: CGFloat,
-        lineWidth: CGFloat,
-        blur: CGFloat,
-        color: Color,
-        cornerRadius: CGFloat
-    ) -> some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .inset(by: inset)
-            .stroke(color, lineWidth: lineWidth)
-            .blur(radius: blur)
-    }
 }
 
 // MARK: - Soft partial / ring-light segment
@@ -112,26 +48,46 @@ private struct SoftSegmentGlow: View {
     var body: some View {
         let rect = segmentRect(for: segment, in: screenSize)
         let intensity = segment.brightness * masterOpacity
-        
-        let depth = rect.height
+        let depth = segment.edge == .top || segment.edge == .bottom ? rect.height : rect.width
         let corner = min(max(depth * 0.15, 4.0), 14.0)
-        let blur = min(max(depth * 0.06, 2.0), 10.0)
+        let diffuserBlur = min(max(segment.softness * 0.35, depth * 0.035), 30.0)
+        let bloomBlur = min(max(segment.bloom + segment.softness * 0.65, 4.0), 52.0)
+        let colors = palette
         
-        capsuleGradientFill(
-            rect: rect,
-            corner: corner,
-            fill: LinearGradient(
-                stops: [
-                    .init(color: .white.opacity(intensity), location: 0.0),
-                    .init(color: .white.opacity(intensity * 0.40), location: 0.30),
-                    .init(color: .white.opacity(intensity * 0.08), location: 0.65),
-                    .init(color: .clear, location: 1.0)
-                ],
-                startPoint: gradientStart(for: segment.edge),
-                endPoint: gradientEnd(for: segment.edge)
-            ),
-            blur: blur
-        )
+        ZStack {
+            capsuleGradientFill(
+                rect: rect,
+                corner: corner,
+                fill: LinearGradient(
+                    stops: [
+                        .init(color: colors.bloom.opacity(intensity * 0.32), location: 0.0),
+                        .init(color: colors.bloom.opacity(intensity * 0.15), location: 0.36),
+                        .init(color: .clear, location: 1.0)
+                    ],
+                    startPoint: gradientStart(for: segment.edge),
+                    endPoint: gradientEnd(for: segment.edge)
+                ),
+                blur: bloomBlur
+            )
+
+            capsuleGradientFill(
+                rect: rect,
+                corner: corner,
+                fill: LinearGradient(
+                    stops: [
+                        .init(color: colors.highlight.opacity(intensity * 0.96), location: 0.0),
+                        .init(color: colors.base.opacity(intensity * 0.72), location: 0.14),
+                        .init(color: colors.base.opacity(intensity * 0.32), location: 0.42),
+                        .init(color: colors.bloom.opacity(intensity * 0.08), location: 0.70),
+                        .init(color: .clear, location: 1.0)
+                    ],
+                    startPoint: gradientStart(for: segment.edge),
+                    endPoint: gradientEnd(for: segment.edge)
+                ),
+                blur: diffuserBlur
+            )
+        }
+        .frame(width: screenSize.width, height: screenSize.height)
         .mask(endFeatherMask(for: segment, in: screenSize))
         .blendMode(.plusLighter)
     }
@@ -180,7 +136,7 @@ private struct SoftSegmentGlow: View {
         let start = max(0.0, min(1.0, segment.startFraction))
         let end = max(start, min(1.0, segment.endFraction))
         // Thickness directly controls how deep the light gradient penetrates from the bezel edge into the screen
-        let depth = max(segment.thickness * 0.65, 28.0)
+        let depth = min(max(segment.thickness * 0.65, 24.0), 240.0)
         
         switch segment.edge {
         case .top:
@@ -211,39 +167,25 @@ private struct SoftSegmentGlow: View {
         case .right: return .leading
         }
     }
+
+    private var palette: GlowPalette {
+        if let colorHex = segment.colorHex,
+           let customColor = Color(hexString: colorHex) {
+            return GlowPalette(base: customColor, highlight: customColor, bloom: customColor)
+        }
+
+        return GlowPalette(
+            base: ColorTemperature.color(fromKelvin: segment.kelvinTemp),
+            highlight: ColorTemperature.highlightColor(fromKelvin: segment.kelvinTemp),
+            bloom: ColorTemperature.bloomColor(fromKelvin: segment.kelvinTemp)
+        )
+    }
 }
 
-// MARK: - Metrics & palette
-
-private struct FrameMetrics {
-    let thickness: CGFloat
-    let blur: CGFloat
-    let averageBrightness: Double
-    let inset: CGFloat
-    let outerRadius: CGFloat
-    
-    init(segments: [EdgeSegment], screenSize: CGSize) {
-        let top = segments.first(where: { $0.edge == .top })
-        let left = segments.first(where: { $0.edge == .left })
-        let right = segments.first(where: { $0.edge == .right })
-        let bottom = segments.first(where: { $0.edge == .bottom })
-        
-        let topT = top?.thickness ?? 64.0
-        let leftT = left?.thickness ?? 56.0
-        let rightT = right?.thickness ?? 56.0
-        let bottomT = bottom?.thickness ?? 48.0
-        let avgThickness = min(max((topT * 1.1 + leftT + rightT + bottomT * 0.9) / 4.0, 32.0), 1200.0) * 0.55
-        
-        let count = Double(max(segments.count, 1))
-        let brightness = segments.reduce(0.0) { $0 + $1.brightness } / count
-        
-        self.thickness = CGFloat(avgThickness)
-        self.blur = min(max(CGFloat(self.thickness) * 0.04, 2.0), 14.0)
-        self.averageBrightness = brightness
-        self.inset = max(self.thickness * 0.38, 6)
-        let maxCorner = min(screenSize.width, screenSize.height) * 0.045
-        self.outerRadius = min(max(self.thickness * 0.80, 14), maxCorner)
-    }
+private struct GlowPalette {
+    let base: Color
+    let highlight: Color
+    let bloom: Color
 }
 
 // MARK: - Hex color helper

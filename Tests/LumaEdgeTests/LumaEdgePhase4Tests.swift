@@ -38,6 +38,35 @@ final class LumaEdgePhase4Tests: XCTestCase {
         XCTAssertEqual(carved[1].startFraction, 0.70, accuracy: 0.001)
         XCTAssertEqual(carved[1].endFraction, 1.0, accuracy: 0.001)
     }
+
+    func testCarvingPreservesTheOriginalSegmentAppearance() {
+        let original = EdgeSegment(
+            edge: .bottom,
+            thickness: 176,
+            kelvinTemp: 3000,
+            colorHex: "#FFB870",
+            brightness: 0.62,
+            softness: 28,
+            bloom: 19
+        )
+        let cutout = KnownAppCutout(
+            bundleID: "com.example.call",
+            appName: "Call controls",
+            edge: .bottom,
+            startFraction: 0.4,
+            endFraction: 0.6
+        )
+
+        let carved = RegionCarver.carveSegments([original], around: [cutout])
+
+        XCTAssertEqual(carved.count, 2)
+        XCTAssertEqual(carved[0].thickness, original.thickness)
+        XCTAssertEqual(carved[0].kelvinTemp, original.kelvinTemp)
+        XCTAssertEqual(carved[0].colorHex, original.colorHex)
+        XCTAssertEqual(carved[0].softness, original.softness)
+        XCTAssertEqual(carved[0].bloom, original.bloom)
+        XCTAssertEqual(carved[1].brightness, original.brightness)
+    }
     
     func testBuiltInCutoutsPreCalibratedApps() {
         let cutouts = KnownAppCutout.builtInCutouts

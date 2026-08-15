@@ -107,7 +107,7 @@ private struct SegmentEditorRow: View {
                     .foregroundStyle(.secondary)
                     
                     HStack {
-                        Slider(value: $segment.thickness, in: 16...2000, step: 8)
+                        Slider(value: $segment.thickness, in: 16...400, step: 4)
                             .onChange(of: segment.thickness) { oldValue, newValue in onUpdate(segment) }
                         Slider(value: $segment.softness, in: 4...120, step: 2)
                             .onChange(of: segment.softness) { oldValue, newValue in onUpdate(segment) }

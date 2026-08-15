@@ -52,7 +52,7 @@ public struct MenuBarView: View {
             .padding(.bottom, 4)
             
             Divider()
-            
+
             // Brightness Slider
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -79,7 +79,7 @@ public struct MenuBarView: View {
                         .font(.system(size: 12, weight: .semibold).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
-                Slider(value: $thickness, in: 16.0...800.0, step: 4.0)
+                Slider(value: $thickness, in: 16.0...400.0, step: 4.0)
                     .onChange(of: thickness) { oldValue, newValue in
                         updateThickness(newValue)
                     }

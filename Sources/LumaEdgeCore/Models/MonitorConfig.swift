@@ -15,6 +15,9 @@ public struct MonitorConfig: Codable, Identifiable, Equatable, Sendable {
     public var isEnabled: Bool
     public var brightnessScale: Double // Per-display multiplier (0.0 to 1.0)
     public var segments: [EdgeSegment]
+    /// The user's full-frame layout, retained while a temporary ring-light layout is active.
+    /// This keeps switching modes reversible instead of replacing a custom setup with defaults.
+    public var savedEdgeSegments: [EdgeSegment]?
     public var isVirtualRingMode: Bool
     public var virtualRingPosition: VirtualRingPosition
     public var safeWorkspaceMode: SafeWorkspaceMode
@@ -30,6 +33,7 @@ public struct MonitorConfig: Codable, Identifiable, Equatable, Sendable {
             .defaultRight,
             .defaultBottom
         ],
+        savedEdgeSegments: [EdgeSegment]? = nil,
         isVirtualRingMode: Bool = false,
         virtualRingPosition: VirtualRingPosition = .webcamCenter,
         safeWorkspaceMode: SafeWorkspaceMode = .off
@@ -39,6 +43,7 @@ public struct MonitorConfig: Codable, Identifiable, Equatable, Sendable {
         self.isEnabled = isEnabled
         self.brightnessScale = brightnessScale
         self.segments = segments
+        self.savedEdgeSegments = savedEdgeSegments
         self.isVirtualRingMode = isVirtualRingMode
         self.virtualRingPosition = virtualRingPosition
         self.safeWorkspaceMode = safeWorkspaceMode

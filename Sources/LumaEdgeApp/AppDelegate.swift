@@ -84,12 +84,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         case "width", "thickness":
             if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-               let valStr = components.queryItems?.first(where: { $0.name == "value" })?.value,
+               let valStr = components.queryItems?.first(where: { $0.name == "value" || $0.name == "px" })?.value,
                let val = Double(valStr) {
                 for key in engine.monitorConfigs.keys {
                     guard var config = engine.monitorConfigs[key] else { continue }
                     for i in 0..<config.segments.count {
                         config.segments[i].thickness = Double(max(16.0, min(400.0, val)))
+                    }
+                    engine.monitorConfigs[key] = config
+                }
+            }
+        case "kelvin":
+            if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+               let valStr = components.queryItems?.first(where: { $0.name == "value" })?.value,
+               let val = Double(valStr) {
+                for key in engine.monitorConfigs.keys {
+                    guard var config = engine.monitorConfigs[key] else { continue }
+                    for i in 0..<config.segments.count {
+                        config.segments[i].kelvinTemp = Double(max(2000.0, min(10_000.0, val)))
                     }
                     engine.monitorConfigs[key] = config
                 }
