@@ -88,6 +88,7 @@ public final class LightingProfilesManager: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private var previousPresetIDBeforeTrigger: String?
+    private var previousMonitorConfigsBeforeTrigger: [String: MonitorConfig]?
     private let engine = LightingEngine.shared
     
     public init() {
@@ -127,10 +128,11 @@ public final class LightingProfilesManager: ObservableObject {
     public func evaluateCurrentRunningApps() {
         guard isProfilesAutomationEnabled else { return }
         
-        let runningBundles = Set(NSWorkspace.shared.runningApplications.compactMap { $0.bundleIdentifier })
-        
-        // Find if any enabled profile matches a currently running application
-        if let matchingProfile = profiles.first(where: { $0.isEnabled && runningBundles.contains($0.bundleID) }) {
+        let frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+
+        // Profiles should follow the app someone is actually using, not a meeting app
+        // that happens to be open in the background.
+        if let matchingProfile = profiles.first(where: { $0.isEnabled && $0.bundleID == frontmostBundleID }) {
             if activeTriggeredProfile?.id != matchingProfile.id {
                 applyProfile(matchingProfile)
             }
@@ -142,6 +144,7 @@ public final class LightingProfilesManager: ObservableObject {
     public func applyProfile(_ profile: AppProfile) {
         if activeTriggeredProfile == nil {
             previousPresetIDBeforeTrigger = engine.activePreset.id
+            previousMonitorConfigsBeforeTrigger = engine.monitorConfigs
         }
         activeTriggeredProfile = profile
         
@@ -167,7 +170,11 @@ public final class LightingProfilesManager: ObservableObject {
            let preset = GlowPreset.builtInPresets.first(where: { $0.id == prevID }) {
             engine.applyPreset(preset)
         }
+        if let previousMonitorConfigsBeforeTrigger {
+            engine.monitorConfigs = previousMonitorConfigsBeforeTrigger
+        }
         previousPresetIDBeforeTrigger = nil
+        previousMonitorConfigsBeforeTrigger = nil
     }
     
     private func loadProfiles() {

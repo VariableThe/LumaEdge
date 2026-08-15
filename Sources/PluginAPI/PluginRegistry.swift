@@ -100,7 +100,7 @@ public final class PluginRegistry: ObservableObject {
                 for key in engine.monitorConfigs.keys {
                     guard var config = engine.monitorConfigs[key] else { continue }
                     for i in 0..<config.segments.count {
-                        config.segments[i].kelvinTemp = Double(max(2700.0, min(6500.0, val)))
+                        config.segments[i].kelvinTemp = Double(max(2000.0, min(10_000.0, val)))
                     }
                     engine.monitorConfigs[key] = config
                 }

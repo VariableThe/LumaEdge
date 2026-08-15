@@ -14,7 +14,7 @@ guard !args.isEmpty else {
       off                 Turns edge lighting off
       preset <id>         Applies a lighting preset by ID (e.g., studio_white, daylight, warm_lamp, sunset)
       brightness <val>    Sets overall edge brightness (0.0 - 1.0)
-      kelvin <val>        Sets color temperature in Kelvin (2700 - 6500)
+      kelvin <val>        Sets color temperature in Kelvin (2000 - 10000)
       status              Prints available presets and current state
     """)
     exit(0)
@@ -79,7 +79,7 @@ case "brightness":
     
 case "kelvin":
     guard args.count > 1, let val = Double(args[1]) else {
-        print("Error: Missing or invalid Kelvin value (2700 - 6500)")
+        print("Error: Missing or invalid Kelvin value (2000 - 10000)")
         exit(1)
     }
     print("Setting Kelvin temperature to \(val)K...")

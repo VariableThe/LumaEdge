@@ -105,13 +105,35 @@ public struct EdgeSegment: Codable, Identifiable, Equatable, Sendable {
         self.edge = edge
         self.startFraction = max(0.0, min(1.0, startFraction))
         self.endFraction = max(self.startFraction, min(1.0, endFraction))
-        self.thickness = max(4.0, min(2000.0, thickness))
+        self.thickness = max(16.0, min(400.0, thickness))
         self.kelvinTemp = max(2000.0, min(10000.0, kelvinTemp))
         self.colorHex = colorHex
         self.brightness = max(0.0, min(1.0, brightness))
         self.softness = max(0.0, min(150.0, softness))
         self.bloom = max(0.0, min(100.0, bloom))
         self.isEnabled = isEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, edge, startFraction, endFraction, thickness, kelvinTemp
+        case colorHex, brightness, softness, bloom, isEnabled
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            id: values.decode(String.self, forKey: .id),
+            edge: values.decode(ScreenEdge.self, forKey: .edge),
+            startFraction: values.decode(Double.self, forKey: .startFraction),
+            endFraction: values.decode(Double.self, forKey: .endFraction),
+            thickness: values.decode(Double.self, forKey: .thickness),
+            kelvinTemp: values.decode(Double.self, forKey: .kelvinTemp),
+            colorHex: values.decodeIfPresent(String.self, forKey: .colorHex),
+            brightness: values.decode(Double.self, forKey: .brightness),
+            softness: values.decode(Double.self, forKey: .softness),
+            bloom: values.decode(Double.self, forKey: .bloom),
+            isEnabled: values.decode(Bool.self, forKey: .isEnabled)
+        )
     }
     
     public static var defaultTop: EdgeSegment {

@@ -35,7 +35,7 @@ public final class LightingEngine: ObservableObject {
             }
         }
     }
-    
+
     /// System ambient light sensor
     public let ambientLightSensor = AmbientLightSensor.shared
 
@@ -46,6 +46,7 @@ public final class LightingEngine: ObservableObject {
     @Published public var ambientLightThreshold: Double = 120.0 {
         didSet {
             defaults.set(ambientLightThreshold, forKey: DefaultsKeys.ambientLightThreshold)
+            notifyOverlayUpdate()
         }
     }
 
@@ -61,13 +62,16 @@ public final class LightingEngine: ObservableObject {
     private var isAmbientLightLowEnough: Bool {
         guard isAmbientLightGatingEnabled else { return true }
         guard ambientLightSensor.isAvailable else { return true }
+        guard ambientLightSensor.lux >= 0 else { return true }
         return ambientLightSensor.lux < ambientLightThreshold
     }
 
-    /// True only when all illumination conditions are satisfied:
-    /// master armed, camera active, and ambient light is below threshold.
+    /// True only when the master switch is armed, another application is actively
+    /// using a camera, and the ambient-light gate permits illumination.
     public var isEffectivelyIlluminated: Bool {
-        isMasterEnabled && isCameraActive && isAmbientLightLowEnough
+        isMasterEnabled
+            && isCameraActive
+            && isAmbientLightLowEnough
     }
     
     public func setCameraActive(_ active: Bool) {
@@ -187,39 +191,53 @@ public final class LightingEngine: ObservableObject {
     
     private func applyPresetToAllSegments(_ preset: GlowPreset) {
         for (screenID, var config) in monitorConfigs {
-            for i in 0..<config.segments.count {
-                config.segments[i].kelvinTemp = preset.kelvinTemp
-                config.segments[i].brightness = preset.defaultBrightness
-                config.segments[i].thickness = preset.defaultWidth
-                config.segments[i].softness = preset.softness
-                config.segments[i].bloom = preset.bloom
+            config.segments = applying(preset, to: config.segments)
+            if let savedEdgeSegments = config.savedEdgeSegments {
+                config.savedEdgeSegments = applying(preset, to: savedEdgeSegments)
             }
             monitorConfigs[screenID] = config
+        }
+    }
+
+    private func applying(_ preset: GlowPreset, to segments: [EdgeSegment]) -> [EdgeSegment] {
+        segments.map { segment in
+            var updated = segment
+            updated.kelvinTemp = preset.kelvinTemp
+            updated.colorHex = preset.colorHex
+            updated.brightness = preset.defaultBrightness
+            updated.thickness = preset.defaultWidth
+            updated.softness = preset.softness
+            updated.bloom = preset.bloom
+            return updated
         }
     }
     
     public func setVirtualRingMode(_ enabled: Bool, position: VirtualRingPosition = .webcamCenter, forMonitor screenID: String) {
         guard var config = monitorConfigs[screenID] else { return }
-        config.isVirtualRingMode = enabled
-        config.virtualRingPosition = position
         if enabled {
+            if !config.isVirtualRingMode {
+                config.savedEdgeSegments = config.segments
+            }
+            config.isVirtualRingMode = true
+            config.virtualRingPosition = position
             var ringSeg = position.defaultSegment
             ringSeg.kelvinTemp = activePreset.kelvinTemp
+            ringSeg.colorHex = activePreset.colorHex
             ringSeg.brightness = activePreset.defaultBrightness
+            ringSeg.thickness = activePreset.defaultWidth
+            ringSeg.softness = activePreset.softness
+            ringSeg.bloom = activePreset.bloom
             config.segments = [ringSeg]
         } else {
-            config.segments = [
-                .defaultTop,
-                .defaultLeft,
-                .defaultRight,
-                .defaultBottom
-            ]
-            for i in 0..<config.segments.count {
-                config.segments[i].kelvinTemp = activePreset.kelvinTemp
-                config.segments[i].brightness = activePreset.defaultBrightness
-            }
+            config.isVirtualRingMode = false
+            config.segments = config.savedEdgeSegments ?? applying(activePreset, to: Self.defaultEdgeSegments)
+            config.savedEdgeSegments = nil
         }
         monitorConfigs[screenID] = config
+    }
+
+    private static var defaultEdgeSegments: [EdgeSegment] {
+        [.defaultTop, .defaultLeft, .defaultRight, .defaultBottom]
     }
     
     public func updateSegment(_ segment: EdgeSegment, forMonitor screenID: String) {

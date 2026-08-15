@@ -3,29 +3,16 @@ import LumaEdgeCore
 
 public struct GeneralSettingsView: View {
     @ObservedObject private var engine = LightingEngine.shared
-    @AppStorage("LumaEdge_LaunchAtLogin") private var launchAtLogin = false
-    @AppStorage("LumaEdge_GlobalShortcut") private var shortcutText = "⌃⌥L"
     
     public init() {}
     
     public var body: some View {
         Form {
-            Section("System & Startup") {
-                Toggle("Launch LumaEdge at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { oldValue, newValue in
-                        // SMAppService registration bridged in Phase 2
-                    }
-                
-                HStack {
-                    Text("Global Keyboard Shortcut")
-                    Spacer()
-                    Text(shortcutText)
-                        .font(.system(size: 13, weight: .bold).monospaced())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.secondary.opacity(0.15))
-                        .cornerRadius(6)
-                }
+            Section("Lighting") {
+                Toggle("Enable edge light for video calls", isOn: $engine.isMasterEnabled)
+                Text("LumaEdge appears only while another application is using a camera and the ambient-light gate allows it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             
             Section("Ambient Light Gating") {

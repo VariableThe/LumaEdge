@@ -16,6 +16,7 @@ DerivedData/
 .DS_Store
 *.swp
 *~.nib
+build/LumaEdge.app/Contents/_CodeSignature/
 
 # Caches & Scratch
 scratch/

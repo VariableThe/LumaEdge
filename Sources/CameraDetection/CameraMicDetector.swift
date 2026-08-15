@@ -1,8 +1,9 @@
 import Foundation
 import Combine
-import CoreMediaIO
 import CoreAudio
+import CoreMediaIO
 import AppKit
+import AVFoundation
 import LumaEdgeCore
 
 @MainActor
@@ -76,81 +77,68 @@ public final class CameraMicDetector: ObservableObject {
     }
     
     private func checkCameraActive() -> Bool {
-        var opa = CMIOObjectPropertyAddress(
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .external],
+            mediaType: .video,
+            position: .unspecified
+        )
+        if discoverySession.devices.contains(where: { device in
+            device.isInUseByAnotherApplication
+        }) {
+            return true
+        }
+
+        // Some Chromium/Electron capture paths do not surface through
+        // AVCaptureDevice's per-app flag. CoreMediaIO's documented system-wide
+        // running flag reports whether a video device is actually performing I/O.
+        return isAnyVideoDeviceRunningSomewhere()
+    }
+
+    private func isAnyVideoDeviceRunningSomewhere() -> Bool {
+        var systemAddress = CMIOObjectPropertyAddress(
             mSelector: CMIOObjectPropertySelector(kCMIOHardwarePropertyDevices),
             mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
             mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain)
         )
-        
         var dataSize: UInt32 = 0
         var dataUsed: UInt32 = 0
-        var status = CMIOObjectGetPropertyDataSize(CMIOObjectID(kCMIOObjectSystemObject), &opa, 0, nil, &dataSize)
-        guard status == OSStatus(kCMIOHardwareNoError) && dataSize > 0 else { return false }
-        
-        let deviceCount = Int(dataSize) / MemoryLayout<CMIOObjectID>.size
-        var devices = [CMIOObjectID](repeating: 0, count: deviceCount)
-        status = CMIOObjectGetPropertyData(CMIOObjectID(kCMIOObjectSystemObject), &opa, 0, nil, dataSize, &dataUsed, &devices)
-        guard status == OSStatus(kCMIOHardwareNoError) else { return false }
-        
+        let systemObject = CMIOObjectID(kCMIOObjectSystemObject)
+
+        guard CMIOObjectGetPropertyDataSize(systemObject, &systemAddress, 0, nil, &dataSize) == noErr,
+              dataSize > 0 else {
+            return false
+        }
+
+        let count = Int(dataSize) / MemoryLayout<CMIOObjectID>.size
+        var devices = [CMIOObjectID](repeating: 0, count: count)
+        guard CMIOObjectGetPropertyData(systemObject, &systemAddress, 0, nil, dataSize, &dataUsed, &devices) == noErr else {
+            return false
+        }
+
         for device in devices {
-            // First check: kCMIODevicePropertyProcessIsRunningSomewhere ('prsn', 0x7072736e)
-            // Inspects exact process PIDs streaming from this camera.
-            var prsnAddress = CMIOObjectPropertyAddress(
-                mSelector: CMIOObjectPropertySelector(0x7072736e),
-                mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeWildcard),
-                mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementWildcard)
-            )
-            
-            if CMIOObjectHasProperty(device, &prsnAddress) {
-                var pidSize: UInt32 = 0
-                let errSize = CMIOObjectGetPropertyDataSize(device, &prsnAddress, 0, nil, &pidSize)
-                if errSize == OSStatus(kCMIOHardwareNoError) && pidSize > 0 {
-                    let pidCount = Int(pidSize) / MemoryLayout<pid_t>.size
-                    var pids = [pid_t](repeating: 0, count: pidCount)
-                    let errData = CMIOObjectGetPropertyData(device, &prsnAddress, 0, nil, pidSize, &dataUsed, &pids)
-                    if errData == OSStatus(kCMIOHardwareNoError) {
-                        let activeClientPids = pids.filter { pid in
-                            guard pid > 0 && pid != getpid() else { return false }
-                            if let app = NSRunningApplication(processIdentifier: pid) {
-                                let bundleID = app.bundleIdentifier ?? ""
-                                // Ignore system/background daemons merely probing or holding standby references
-                                if bundleID.hasPrefix("com.apple.cmio") ||
-                                   bundleID.hasPrefix("com.apple.audio") ||
-                                   bundleID.hasPrefix("com.apple.ControlCenter") ||
-                                   bundleID.hasPrefix("com.apple.SystemSettings") {
-                                    return false
-                                }
-                                return true
-                            }
-                            return true
-                        }
-                        if !activeClientPids.isEmpty {
-                            return true
-                        }
-                        // If 'prsn' is supported and returned empty or daemons only, this camera is idle
-                        continue
-                    }
-                } else if errSize == OSStatus(kCMIOHardwareNoError) && pidSize == 0 {
-                    continue
-                }
-            }
-            
-            // Fallback for devices where 'prsn' is not exposed: check 'runn'
-            var propAddress = CMIOObjectPropertyAddress(
+            var runningAddress = CMIOObjectPropertyAddress(
                 mSelector: CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere),
-                mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeWildcard),
-                mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementWildcard)
+                mScope: CMIOObjectPropertyScope(kCMIOObjectPropertyScopeGlobal),
+                mElement: CMIOObjectPropertyElement(kCMIOObjectPropertyElementMain)
             )
-            
+            guard CMIOObjectHasProperty(device, &runningAddress) else { continue }
+
             var isRunning: UInt32 = 0
-            let propSize = UInt32(MemoryLayout<UInt32>.size)
-            if CMIOObjectHasProperty(device, &propAddress) {
-                let err = CMIOObjectGetPropertyData(device, &propAddress, 0, nil, propSize, &dataUsed, &isRunning)
-                if err == OSStatus(kCMIOHardwareNoError) && isRunning != 0 {
-                    return true
-                }
+            let runningDataSize = UInt32(MemoryLayout<UInt32>.size)
+            let status = CMIOObjectGetPropertyData(
+                device,
+                &runningAddress,
+                0,
+                nil,
+                runningDataSize,
+                &dataUsed,
+                &isRunning
+            )
+            if status == noErr && isRunning != 0 {
+                return true
             }
         }
+
         return false
     }
     

@@ -47,4 +47,41 @@ final class LumaEdgeCoreTests: XCTestCase {
         _ = ColorTemperature.highlightColor(fromKelvin: 6500)
         XCTAssertGreaterThan(base.red + base.green + base.blue, 0)
     }
+
+    @MainActor
+    func testCameraIsRequiredForIllumination() {
+        let engine = LightingEngine.shared
+        engine.isMasterEnabled = true
+        engine.isAmbientLightGatingEnabled = false
+        engine.setCameraActive(false)
+
+        XCTAssertFalse(engine.isEffectivelyIlluminated)
+    }
+
+    @MainActor
+    func testRingModeRestoresThePreviousEdgeLayout() {
+        let engine = LightingEngine.shared
+        let screenID = "test-preserved-layout"
+        let originalSegments = [
+            EdgeSegment(
+                edge: .top,
+                startFraction: 0.15,
+                endFraction: 0.85,
+                thickness: 144,
+                kelvinTemp: 3200,
+                colorHex: "#FFCC88",
+                brightness: 0.66,
+                softness: 22,
+                bloom: 18,
+                isEnabled: true
+            ),
+            EdgeSegment(edge: .bottom, isEnabled: false)
+        ]
+        engine.monitorConfigs[screenID] = MonitorConfig(id: screenID, segments: originalSegments)
+
+        engine.setVirtualRingMode(true, position: .webcamCenter, forMonitor: screenID)
+        engine.setVirtualRingMode(false, forMonitor: screenID)
+
+        XCTAssertEqual(engine.monitorConfigs[screenID]?.segments, originalSegments)
+    }
 }

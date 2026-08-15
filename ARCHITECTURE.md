@@ -69,15 +69,8 @@ graph TD
   - `ignoresMouseEvents = true` (`100% click-through`).
 
 ### 4. `CameraDetection`
-- **Exact Client Process Gating (`prsn` / `0x7072736e`)**:
-  Probes `kCMIODevicePropertyProcessIsRunningSomewhere` across all connected `AVCaptureDevice` instances. Unlike basic boolean checks that trigger false positives when virtual cameras (Continuity Camera, OBS, Desk View) are registered or when `CoreMediaIO` daemons run in standby, LumaEdge parses the exact client PID (`prsn`) structure:
-  ```swift
-  struct CMIOProcessIsRunningSomewhereData {
-      var processID: pid_t
-      var isRunningSomewhere: UInt32
-  }
-  ```
-  If no non-daemon user process has an active video stream, `isCameraActive` remains `false`.
+- **Active Video-Stream Gating**:
+  Uses `AVCaptureDevice.isInUseByAnotherApplication` first, then CoreMediaIO's documented `kCMIODevicePropertyDeviceIsRunningSomewhere` flag for capture paths that do not expose a per-app state. The light remains off until a video device is actually performing I/O.
 
 ### 5. `AccessibilityManager` & `RegionCarver`
 - **Layered Avoidance**:

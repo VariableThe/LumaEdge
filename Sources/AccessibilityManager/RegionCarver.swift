@@ -96,6 +96,7 @@ public final class RegionCarver: ObservableObject {
     
     private let engine = LightingEngine.shared
     private var cancellables = Set<AnyCancellable>()
+    private var originalSegmentsByScreen: [String: [EdgeSegment]] = [:]
     
     public init() {
         self.isAvoidanceEnabled = UserDefaults.standard.bool(forKey: "LumaEdge_IsAvoidanceEnabled")
@@ -125,6 +126,7 @@ public final class RegionCarver: ObservableObject {
     public func applyLayeredAvoidance() {
         guard isAvoidanceEnabled && engine.isEffectivelyIlluminated else {
             activeTriggeredCutouts.removeAll()
+            restoreOriginalSegments()
             return
         }
         
@@ -156,37 +158,75 @@ public final class RegionCarver: ObservableObject {
     }
     
     public func carveMonitorSegments(with cutouts: [KnownAppCutout]) {
+        guard !cutouts.isEmpty else {
+            restoreOriginalSegments()
+            return
+        }
+
         for screen in NSScreen.screens {
             let screenID = screenIDFor(screen)
             guard var config = engine.monitorConfigs[screenID], !config.isVirtualRingMode else { continue }
-            
-            // Re-initialize base segments to standard edges before applying cutouts
-            var newSegments: [EdgeSegment] = []
-            
-            for baseEdge in ScreenEdge.allCases {
-                let matchingCutouts = cutouts.filter { $0.edge == baseEdge }
-                if matchingCutouts.isEmpty {
-                    switch baseEdge {
-                    case .top: newSegments.append(.defaultTop)
-                    case .bottom: newSegments.append(.defaultBottom)
-                    case .left: newSegments.append(.defaultLeft)
-                    case .right: newSegments.append(.defaultRight)
-                    }
+
+            let originalSegments = originalSegmentsByScreen[screenID] ?? config.segments
+            originalSegmentsByScreen[screenID] = originalSegments
+            config.segments = Self.carveSegments(originalSegments, around: cutouts)
+            engine.monitorConfigs[screenID] = config
+        }
+    }
+
+    private func restoreOriginalSegments() {
+        for (screenID, originalSegments) in originalSegmentsByScreen {
+            guard var config = engine.monitorConfigs[screenID] else { continue }
+            config.segments = originalSegments
+            engine.monitorConfigs[screenID] = config
+        }
+        originalSegmentsByScreen.removeAll()
+    }
+
+    /// Returns a temporary layout that omits the portions hidden by call controls while
+    /// preserving all of the person's existing segment settings.
+    public static func carveSegments(_ segments: [EdgeSegment], around cutouts: [KnownAppCutout]) -> [EdgeSegment] {
+        segments.flatMap { segment in
+            let intervals = cutouts
+                .filter { $0.edge == segment.edge }
+                .compactMap { cutout -> (Double, Double)? in
+                    let start = max(segment.startFraction, min(1.0, cutout.startFraction))
+                    let end = min(segment.endFraction, max(0.0, cutout.endFraction))
+                    return start < end ? (start, end) : nil
+                }
+                .sorted { $0.0 < $1.0 }
+
+            guard !intervals.isEmpty else { return [segment] }
+
+            var merged: [(Double, Double)] = []
+            for interval in intervals {
+                if let last = merged.last, interval.0 <= last.1 {
+                    merged[merged.count - 1] = (last.0, max(last.1, interval.1))
                 } else {
-                    // Carve segment around each cutout on this edge
-                    let carved = Self.carveSegment(edge: baseEdge, cutouts: matchingCutouts, preset: engine.activePreset)
-                    newSegments.append(contentsOf: carved)
+                    merged.append(interval)
                 }
             }
-            
-            // Apply current preset properties onto carved segments
-            for i in 0..<newSegments.count {
-                newSegments[i].kelvinTemp = engine.activePreset.kelvinTemp
-                newSegments[i].brightness = engine.activePreset.defaultBrightness
+
+            var carved: [EdgeSegment] = []
+            var current = segment.startFraction
+            for interval in merged {
+                if current < interval.0 {
+                    var remaining = segment
+                    remaining.id = UUID().uuidString
+                    remaining.startFraction = current
+                    remaining.endFraction = interval.0
+                    carved.append(remaining)
+                }
+                current = max(current, interval.1)
             }
-            
-            config.segments = newSegments
-            engine.monitorConfigs[screenID] = config
+            if current < segment.endFraction {
+                var remaining = segment
+                remaining.id = UUID().uuidString
+                remaining.startFraction = current
+                remaining.endFraction = segment.endFraction
+                carved.append(remaining)
+            }
+            return carved
         }
     }
     
