@@ -10,7 +10,7 @@ on:
 jobs:
   test-and-build:
     name: Build & Test (macOS 14+ Apple Silicon)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
