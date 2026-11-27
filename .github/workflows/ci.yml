@@ -10,7 +10,7 @@ on:
 jobs:
   test-and-build:
     name: Build & Test (macOS 14+ Apple Silicon)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -29,13 +29,20 @@ jobs:
         cp .build/release/LumaEdgeApp build/LumaEdge.app/Contents/MacOS/LumaEdgeApp
         cp .build/release/lumaedge build/LumaEdge.app/Contents/MacOS/lumaedge
 
-    - name: Create Release DMG / Zip
-      if: startsWith(github.ref, 'refs/tags/v')
+    # Upload the archive, not the bundle directory: upload-artifact normalizes file modes.
+    - name: Archive and verify the runnable macOS app
       run: |
-        cd build && zip -r LumaEdge.zip LumaEdge.app
+        set -eu
+        /usr/bin/ditto -c -k --sequesterRsrc --keepParent build/LumaEdge.app build/LumaEdge.zip
+        check_dir="$(mktemp -d "$RUNNER_TEMP/lumaedge-artifact.XXXXXXXX")"
+        /usr/bin/ditto -x -k build/LumaEdge.zip "$check_dir"
+        test -x "$check_dir/LumaEdge.app/Contents/MacOS/LumaEdgeApp"
+        test -x "$check_dir/LumaEdge.app/Contents/MacOS/lumaedge"
+        /usr/bin/plutil -lint "$check_dir/LumaEdge.app/Contents/Info.plist"
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: LumaEdge-macOS
-        path: build/LumaEdge.app
+        path: build/LumaEdge.zip
+        if-no-files-found: error
